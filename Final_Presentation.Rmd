@@ -1,0 +1,108 @@
+---
+title: "Coursera Data Products Class Project"
+author: "Juan Chacin"
+date: "October 23, 2017"
+output:
+  ioslides_presentation: default
+  slidy_presentation: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+## Introduction
+
+- Company ACME maintains an inventory of pumps for sale
+- These pumps are expensive and have a lead time from their supplier of 6 months
+- The company would like to have enough pumps on hand to meet demand but not so many that they sit in inventory for months
+- They have historical data for demand expressed as monthly sales average and standard deviation (normal distribution)
+- They would like to use a Monte Carlo method to estimate when the probability of running out of pumps is greater than 10% in the next 6 months so they know when to order more
+
+## Calculation method {.smaller}
+
+- An R script was written to calculate scenarios based on historical data
+- The inputs for the script are:
+1. Average monthly pump usage
+2. Standard deviation of monthly usage
+3. Quantity on hand in inventory
+- The script then performs 2000 (user input) simulations where:
+1. A monthly usage is calculated for each of the next 6 months using a normal random distribution
+2. That number is subtracted from the initial inventory
+- At the end of the 2000 simulations, the probability of having zero pumps in inventory for each month is calculated 
+- The result is presented in graphical form to the user for a purchasing decision
+
+## Results {.smaller}
+The results for a calculation are shown. The inputs were:
+
+- Initial inventory of 55 pumps
+- Monthly average usage of 10 pumps with a standard deviation of 3.5 pumps
+
+```{r main code, echo = FALSE, fig.height=2.5}
+# Clear the workspace and load libraries
+rm(list = ls())
+
+library("ggplot2",quietly = TRUE)
+
+# Vector of dates expressed as calendar quarters
+
+n_months <- 6       # Months into the future to estimate 
+initial_date <- as.Date("10/1/2017","%m/%d/%Y")
+time_ser <- as.Date(seq(initial_date,by="1 month",length.out=n_months), format = "%m%d%y")
+
+# Monthly part use rate from past history. 
+use_ave <- 10
+use_std <- 3.5
+
+# Start the simulation loop for statistical forecast
+n_sim <- 20000                                    # Number of simulations
+
+# Initialize needed arrays to hold simulation data
+Invent <- matrix(nrow=(n_sim),ncol=n_months)       # matrix to hold inventory numbers for each simulation
+Prob_Inven <- vector(length = n_months)             # Probability of running out. New systems
+
+for (n in 1:n_sim){                 # Loop for number of simulations
+    
+    # Initial inventory values for the simulation
+    Inven_ini <- 55                 # Initial quantity at hand in inventory
+
+    # Loop for all quarters in the simulation 
+    for (i in 1:n_months){              
+
+        # Calculate usage for new systems using normal distribution with past averages
+        use_month <- ceiling(rnorm(1,use_ave,use_std))
+        
+        if (use_month < 0) use_month <- 0     # Make sure the number is not less than zero
+    
+        Inven_ini <- Inven_ini - use_month
+        Invent[n,i] <- Inven_ini              # Update inventory matrix
+        
+    }
+}
+
+# Compute quantiles for each months 
+
+for (i in 1:n_months){
+    P = ecdf(Invent[,i])
+    Prob_Inven[i] <- P(0)*100
+}
+
+# Plot results
+
+plot_data1 <- data.frame(time_ser,Prob_Inven)
+names(plot_data1) <- c("Time","Inventory")
+
+plot1 = ggplot(data = plot_data1) + geom_line(aes(x=plot_data1$Time,y=plot_data1$Inventory)) +  labs(title="Probability of Running Out by Date", x="Date",y="Probability [%]") + theme(plot.title = element_text(size = 18)) + theme(axis.title = element_text(size = 14))
+```
+
+```{r Plot results}
+print(plot1)
+```
+
+## Summary
+
+- A Monte Carlo calculation was performed to estimate the probability of running out of pumps in the next few months
+- The result shows that the probability reaches 10% around early January, 2018
+- Since that is inside of the 6 month lead time, new pumps should be ordered now from the supplier
+- This document contains all the code needed to continue to update the results as new monthly data becomes available
+
